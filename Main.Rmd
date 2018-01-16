@@ -1,0 +1,116 @@
+
+Packages.
+
+```{r}
+library(readr)
+library(choroplethr)
+library(choroplethrMaps)
+library(ggplot2)
+library(ggthemes)
+library(RColorBrewer)
+library(dplyr)
+library(stringr)
+library(tidyr)
+```
+
+```{r}
+electric <- read.csv("electric.csv")
+population <- read.csv("population.csv")
+fips <- read.csv("fips.csv")
+```
+
+```{r}
+head(population)
+```
+
+Filter to NY state FIPS code, starts with 36. Create proportions from total, then remove total.
+
+```{r}
+ny_population <- population %>% filter(str_detect(FIPS.Code, "^36"), Year == 2015) %>% select(region = FIPS.Code, value = Population) 
+
+write_csv(ny_population, "population_cleaned.csv")
+```
+
+```{r}
+choro1 <- CountyChoropleth$new(ny_population)
+choro1$set_zoom("new york")
+choro1$title <- "Population"
+choro1$set_num_colors(1)
+choro1$ggplot_polygon <- geom_polygon(aes(fill= value), color=NA)
+choro1$ggplot_scale <- scale_fill_gradientn(name = "Population", colours = brewer.pal(8, "Blues"))
+choro1$render()
+```
+
+```{r}
+ny_population_proportion <- population %>% filter(str_detect(FIPS.Code, "^36"), Year == 2015) %>% mutate(value = Population / population[1,"Population"] *100) %>% select(region = FIPS.Code, value = Population) %>% filter(value != 1)
+```
+
+```{r}
+choro1 <- CountyChoropleth$new(ny_population_proportion)
+choro1$set_zoom("new york")
+choro1$title <- "Population"
+choro1$set_num_colors(1)
+choro1$ggplot_polygon <- geom_polygon(aes(fill= value), color=NA)
+choro1$ggplot_scale <- scale_fill_gradientn(name = "Population", colours = brewer.pal(8, "Blues"))
+choro1$render()
+```
+
+Electric cars.
+
+```{r}
+head(electric)
+```
+
+To get FIPS codes for mapping, merge the two datasets.
+
+```{r}
+fips_cleaned <- fips %>% mutate(county = tolower(County.Name)) %>% mutate(county = str_trim(str_replace_all(county, "county", ""))) %>% select(county, FIPS)
+```
+
+```{r}
+electric_merged <- electric %>% mutate(county = str_trim(tolower(County))) %>% inner_join(fips_cleaned, by="county") %>% mutate(FIPS = FIPS + 36000) %>% select(region = FIPS, value = Registration.Class)
+
+write_csv(electric_merged, "electric_cleaned.csv")
+```
+
+```{r}
+choro3 <- CountyChoropleth$new(electric_merged)
+choro3$set_zoom("new york")
+choro3$title <- "Population"
+choro3$set_num_colors(1)
+choro3$ggplot_polygon <- geom_polygon(aes(fill= value), color=NA)
+choro3$ggplot_scale <- scale_fill_gradientn(name = "Electric Cars", colours = brewer.pal(8, "Greens"), na.value = "white")
+choro3$render()
+```
+
+Pretty similar phenomenon - you have a lot of electric cars where there are a lot of people.
+
+Farmers markets:
+
+```{r}
+farmers <- read.csv("farmers_markets.csv")
+```
+
+```{r}
+farmers_cleaned <- farmers %>% select(county = County, name = Market.Name) %>% mutate(county = tolower(county)) %>% inner_join(fips_cleaned, by="county") %>% mutate(FIPS = FIPS + 36000) %>% select(region = FIPS, name) %>% group_by(region) %>% summarise(value = n())
+
+write_csv(farmers_cleaned, "farmers_cleaned.csv")
+```
+
+```{r}
+choro4 <- CountyChoropleth$new(farmers_cleaned)
+choro4$set_zoom("new york")
+choro4$title <- "Farmers Markets"
+choro4$set_num_colors(1)
+choro4$ggplot_polygon <- geom_polygon(aes(fill= value), color=NA)
+choro4$ggplot_scale <- scale_fill_gradientn(name = "Farmers Markets", colours = brewer.pal(8, "Reds"), na.value = "white")
+choro4$render()
+```
+
+
+
+
+
+
+
+
